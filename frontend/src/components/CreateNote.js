@@ -1,4 +1,4 @@
-import React, { Component } from "react";
+import React, { Component, cloneElement } from "react";
 import axios from "axios";
 import DatePicker from 'react-datepicker'
 import 'react-datepicker/dist/react-datepicker.css'
@@ -9,21 +9,57 @@ export default class CreateNote extends Component {
     userSelected: '',
     title: '',
     description: '',
-    date: new Date()
+    date: new Date(),
+    editing: false,
+    _id: ''
   };
 
   async componentDidMount() {
-    const users = this.getUsers();
+    const id = this.props.match.params.id;
+    const users = await this.getUsers();
+    if (id) {
+      this.getNote(id);
+      this.setState({
+      editing: true,
+      _id: id
+    });
+  }
+  }
+
+  getNote = async (id) => {
+    const res = await axios.get(`http://localhost:4000/api/notes/${id}`);
+    const { title, description, date, author } = res.data.message;
+    this.setState({
+      title,
+      description,
+      date: new Date(date),
+      author
+    })
   }
 
   getUsers = async () => {
     const res = await axios.get("http://localhost:4000/api/users");
-    this.setState({ users: res.data.message.map((user) => user.username) });
+    this.setState({ 
+        users: res.data.message.map((user) => user.username),
+        userSelected: !!res.data.message.length ? res.data.message[0].username : '' 
+    });
   };
 
-  onSubmit = (e) => {
+  onSubmit = async (e) => {
     e.preventDefault();
-    console.log(this.state);
+    const newNote = {
+      title: this.state.title,
+      description: this.state.description,
+      date: this.state.date,
+      userSelected: this.state.userSelected
+  };
+  let res = '';
+    if (this.state.editing) {
+      res = await axios.put(`http://localhost:4000/api/notes/${this.state._id}`, newNote);
+    } else {
+      res = await axios.post("http://localhost:4000/api/notes", newNote);
+    }
+    if (res.status === 200) window.location.href = '/';
   };
 
   onInputChange = (e) => {
@@ -48,6 +84,7 @@ export default class CreateNote extends Component {
               className="form-control"
               name="userSelected"
               onChange={this.onInputChange}
+              value={this.state.userSelected}
             >
               {this.state.users.map((user) => (
                 <option key={user} value={user}>
@@ -66,6 +103,7 @@ export default class CreateNote extends Component {
               name="title"
               required
               onChange={this.onInputChange}
+              value={this.state.title}
             />
           </div>
 
@@ -75,6 +113,7 @@ export default class CreateNote extends Component {
               className="form-control"
               placeholder="description"
               onChange={this.onInputChange}
+              value={this.state.description}
             ></textarea>
           </div>
 
@@ -83,6 +122,7 @@ export default class CreateNote extends Component {
                 className="form-control"
                 selected={this.state.date}
                 onChange={this.onChangeDate}
+                value={this.state.date}
                 />
           </div>
           <form onSubmit={this.onSubmit}>
